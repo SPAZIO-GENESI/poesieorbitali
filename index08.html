@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
   <meta charset="utf-8">
-  <title>Performance Map Sequencer</title>
+  <title>POESIE ORBITALI</title>
 
   <style>
     body {
@@ -60,9 +60,7 @@
 
   const logDiv = document.getElementById("log");
   function log(t) {
-    const line = document.createElement("span");
-    line.textContent = t + "\n";
-    logDiv.appendChild(line);
+    logDiv.textContent += t + "\n";
     logDiv.scrollTop = logDiv.scrollHeight;
   }
 
@@ -81,13 +79,13 @@
     {
       kmz: "kmz/ariafresca.kmz",
       view: { lat: 42.351803, lng: 13.396453, zoom: 15, bearing: -34 },
-      speed: 700,
+      speed: 500,
       pauseAfter: 2000
     },
     {
       kmz: "kmz/casesparse.kmz",
       view: { lat: 42.351803, lng: 13.396453, zoom: 16, bearing: -30 },
-      speed: 900,
+      speed: 500,
       pauseAfter: 3000
     }
   ];
@@ -100,28 +98,6 @@
       lat: a.lat + (b.lat - a.lat) * t,
       lng: a.lng + (b.lng - a.lng) * t
     };
-  }
-
-  // === SPOSTAMENTO CURSORE SENZA TRACCIA (tra una polyline e l'altra) ===
-  function moveCursor(from, to, group, durationMs) {
-    return new Promise(resolve => {
-      if (!map.hasLayer(cursor)) group.addLayer(cursor);
-      const start = performance.now();
-
-      function tick(now) {
-        const t = Math.min((now - start) / durationMs, 1);
-        const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
-        cursor.setLatLng(lerp(from, to, ease));
-        if (t < 1) {
-          requestAnimationFrame(tick);
-        } else {
-          cursor.setLatLng(to);
-          resolve();
-        }
-      }
-
-      requestAnimationFrame(tick);
-    });
   }
 
   // === ANIMAZIONE DI UNA POLYLINE (progressione continua) ===
@@ -149,7 +125,6 @@
       // Per compatibilità: velocità = totalLength / (latlngs.length * speed / 1000) gradi/s
       const duration = latlngs.length * speed; // ms totali (stessa durata di prima)
       const startTime = performance.now();
-      let frameCount = 0;
 
       function tick(now) {
         const elapsed = now - startTime;
@@ -172,11 +147,6 @@
 
         partial.addLatLng(p);
         cursor.setLatLng(p);
-
-        frameCount++;
-        if (frameCount % 30 === 0 || t >= 1) {
-          log(`t=${(t*100).toFixed(1)}%  ${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}`);
-        }
 
         if (t < 1) {
           requestAnimationFrame(tick);
@@ -280,21 +250,8 @@
           }
         });
 
-        for (let i = 0; i < polylines.length; i++) {
-          // Se non è la prima, sposta il cursore dall'ultimo punto al primo della prossima
-          if (i > 0) {
-            const prevEnd = polylines[i - 1][polylines[i - 1].length - 1];
-            const nextStart = polylines[i][0];
-            const dist = Math.sqrt(
-              Math.pow(nextStart.lat - prevEnd.lat, 2) +
-              Math.pow(nextStart.lng - prevEnd.lng, 2)
-            );
-            // durata proporzionale alla distanza, min 200ms max 1500ms
-            //const moveDuration = Math.min(1500, Math.max(200, dist * 80000)); veloce
-            const moveDuration = Math.min(4000, Math.max(3000, dist * 800000));
-            await moveCursor(prevEnd, nextStart, currentLayerGroup, moveDuration);
-          }
-          await animatePolyline(polylines[i], entry.speed, currentLayerGroup);
+        for (const line of polylines) {
+          await animatePolyline(line, entry.speed, currentLayerGroup);
         }
 
         log(`Fine ${entry.kmz}, pausa ${entry.pauseAfter}ms`);
