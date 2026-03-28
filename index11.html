@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <title>Poesie Orbitali — Spazio Genesi</title>
- <meta name="referrer" content="strict-origin-when-cross-origin">
+
   <style>
     html, body {
       margin: 0;
@@ -38,7 +38,6 @@
       border-bottom: 1px solid #222;
       padding: 0 1rem;
       flex-shrink: 0;
-      position: relative;
     }
     .sg-navbar .navbar-brand {
       color: #fff;
@@ -70,37 +69,6 @@
     }
     .sg-navbar .navbar-toggler-icon {
       filter: invert(1);
-    }
-    .sg-title {
-      position: absolute;
-      left: 50%;
-      transform: translateX(-50%);
-      text-align: center;
-      pointer-events: none;
-    }
-    .sg-title-main {
-      color: #fff;
-      font-size: 1.35rem;
-      font-weight: 200;
-      letter-spacing: 0.3em;
-      text-transform: uppercase;
-      line-height: 1.2;
-    }
-    .sg-title-sub {
-      color: #fff;
-      font-size: 0.62rem;
-      letter-spacing: 0.22em;
-      text-transform: uppercase;
-    }
-    /* su mobile il titolo si sposta sotto la navbar */
-    @media (max-width: 767px) {
-      .sg-title {
-        position: static;
-        transform: none;
-        width: 100%;
-        padding: 4px 0 6px;
-        order: 3;
-      }
     }
 
     /* === CURSORE PULSANTE === */
@@ -141,19 +109,17 @@
         Spazio Genesi
         <span>ETS — L'Aquila</span>
       </a>
-      <div class="sg-title">
-        <div class="sg-title-main">Poesie Orbitali</div>
-        <div class="sg-title-sub">movimento urbano di Névoa-na-rua</div>
-      </div>
-
       <button class="navbar-toggler" type="button"
               data-bs-toggle="collapse" data-bs-target="#sgNav">
         <span class="navbar-toggler-icon"></span>
       </button>
       <div class="collapse navbar-collapse" id="sgNav">
         <ul class="navbar-nav ms-auto">
-          <li class="nav-item"><a class="nav-link" href="https://abaq.it">ABAQ</a></li>
-          <li class="nav-item"><a class="nav-link" href="https://nevoanarua.spaziogenesi.org">Névoa na rua</a></li>
+          <li class="nav-item"><a class="nav-link" href="https://spaziogenesi.org">Home</a></li>
+          <li class="nav-item"><a class="nav-link" href="https://spaziogenesi.org/chisiamo.html">Chi siamo</a></li>
+          <li class="nav-item"><a class="nav-link" href="https://spaziogenesi.org/biografie/">Biografie</a></li>
+          <li class="nav-item"><a class="nav-link" href="https://spaziogenesi.org/archivio/">Archivio</a></li>
+          <li class="nav-item"><a class="nav-link" href="https://spaziogenesi.org/Iscrizione.html">Iscrizione</a></li>
         </ul>
       </div>
     </div>
@@ -170,15 +136,9 @@
 <script>
   const map = L.map('map', { rotate: true, touchRotate: false }).setView([42.35, 13.40], 12);
 
-  // Tile layer aereo da OpenStreetMap (non sempre disponibile)
-  // L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  //   maxZoom: 19
-  // }).addTo(map);
-
-  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-     attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
-     maxZoom: 19
-   }).addTo(map);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19
+  }).addTo(map);
 
   const logDiv = document.getElementById("log");
   function log(t) {
@@ -194,7 +154,7 @@
     color: "#fff",
     fillColor: "#fff",
     fillOpacity: 1,
-    weight: 4,
+    weight: 2,
     className: "pulse"
   });
 
@@ -202,18 +162,17 @@
   const sequence = [
     {
       kmz: "kmz/ariafresca.kmz",
-      view: { lat: 42.351803, lng: 13.396453, zoom: 15, bearing: -34 },
-      speed: 700,
+      view: { lat: 42.35, lng: 13.40, zoom: 13, bearing: 0 },
+      speed: 150,
       pauseAfter: 2000
     },
     {
       kmz: "kmz/casesparse.kmz",
-      view: { lat: 42.351803, lng: 13.396453, zoom: 16, bearing: -30 },
-      speed: 900,
+      view: { lat: 42.40, lng: 13.45, zoom: 14, bearing: 30 },
+      speed: 100,
       pauseAfter: 3000
     }
   ];
-
 
   let currentLayerGroup = null;
 
@@ -251,7 +210,7 @@
   // speed = pixel al secondo (velocità di scorrimento sulla mappa)
   function animatePolyline(latlngs, speed, group) {
     return new Promise(resolve => {
-      const partial = L.polyline([], { color: "red", weight: 8 });
+      const partial = L.polyline([], { color: "red", weight: 3 });
       group.addLayer(partial);
       group.addLayer(cursor);
 
