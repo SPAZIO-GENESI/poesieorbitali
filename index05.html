@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <title>Performance Map Sequencer</title>
+
+  <style>
+    body {
+      margin: 0;
+      display: flex;
+      height: 100vh;
+      font-family: sans-serif;
+      background: #000;
+    }
+    #map { flex: 3; }
+    #log {
+      flex: 1;
+      padding: 10px;
+      background: #111;
+      color: #0f0;
+      font-size: 13px;
+      overflow-y: auto;
+      white-space: pre;
+    }
+
+    /* === CURSORE PULSANTE === */
+    .pulse {
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%   { opacity: 1; }
+      50%  { opacity: 0.2; }
+      100% { opacity: 1; }
+    }
+
+    /* Dissolvenza dei tracciati */
+    .fadeout {
+      transition: opacity 1s;
+      opacity: 0;
+    }
+  </style>
+
+  <link rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-kmz@latest/dist/leaflet-kmz.js"></script>
+</head>
+<body>
+
+<div id="map"></div>
+<div id="log"></div>
+
+<script>
+  const map = L.map('map').setView([42.35, 13.40], 12);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19
+  }).addTo(map);
+
+  const logDiv = document.getElementById("log");
+  function log(t) {
+    logDiv.textContent += t + "\n";
+    logDiv.scrollTop = logDiv.scrollHeight;
+  }
+
+  // === CURSORE PULSANTE ===
+  const cursor = L.circleMarker([0,0], {
+    radius: 10,
+    color: "#fff",
+    fillColor: "#fff",
+    fillOpacity: 1,
+    weight: 2,
+    className: "pulse"
+  });
+
+  // === LISTA DEI PERCORSI ===
+  const sequence = [
+    {
+      kmz: "kmz/ariafresca.kmz",
+      view: { lat: 42.35, lng: 13.40, zoom: 13 },
+      speed: 150,
+      pauseAfter: 2000
+    },
+    {
+      kmz: "kmz/casesparse.kmz",
+      view: { lat: 42.40, lng: 13.45, zoom: 14 },
+      speed: 100,
+      pauseAfter: 3000
+    }
+  ];
+
+  let currentLayerGroup = null;
+
+  // === ANIMAZIONE DI UNA POLYLINE ===
+  function animatePolyline(latlngs, speed) {
+    return new Promise(resolve => {
+      const partial = L.polyline([], { color: "red", weight: 3 }).addTo(map);
+      cursor.addTo(map);
+
+      let i = 0;
+
+      function step() {
+        if (i >= latlngs.length) {
+          resolve();
+          return;
+        }
+
+        const p = latlngs[i];
+        partial.addLatLng(p);
+        cursor.setLatLng(p);
+
+        log(`Punto ${i}: ${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}`);
+
+        i++;
+        setTimeout(step, speed);
+      }
+
+      step();
+    });
+  }
+
+  // === DISSOLVENZA E RIMOZIONE ===
+  function fadeAndRemove(group) {
+    return new Promise(resolve => {
+      group.eachLayer(layer => {
+        if (layer._path) {
+          layer._path.classList.add("fadeout");
+        }
+      });
+
+      setTimeout(() => {
+        map.removeLayer(group);
+        resolve();
+      }, 1000);
+    });
+  }
+
+  // === CARICA E ANIMA UN KMZ ===
+  async function playKMZ(entry) {
+    log(`\n=== Carico ${entry.kmz} ===`);
+
+    // 🔥 RESET TOTALE CON DISSOLVENZA — attende completamento prima di procedere
+    if (currentLayerGroup) {
+      await fadeAndRemove(currentLayerGroup);
+      currentLayerGroup = null;
+    }
+
+    cursor.remove();
+    currentLayerGroup = L.layerGroup().addTo(map);
+
+    // Imposta l'inquadratura
+    map.setView([entry.view.lat, entry.view.lng], entry.view.zoom);
+
+    await new Promise(resolve => {
+      const kmz = L.kmzLayer();
+
+      kmz.on("load", async e => {
+        const root = e.layer;
+
+        // Sposta TUTTI i layer del KMZ dentro currentLayerGroup
+        root.eachLayer(layer => {
+          currentLayerGroup.addLayer(layer);
+        });
+        map.removeLayer(root);
+
+        const polylines = [];
+
+        currentLayerGroup.eachLayer(layer => {
+          if (layer instanceof L.Polyline) {
+            const lls = layer.getLatLngs();
+            const flat = lls.flat ? lls.flat() : lls;
+            polylines.push(flat);
+            currentLayerGroup.removeLayer(layer);
+          }
+        });
+
+        for (const line of polylines) {
+          await animatePolyline(line, entry.speed);
+        }
+
+        log(`Fine ${entry.kmz}, pausa ${entry.pauseAfter}ms`);
+        setTimeout(resolve, entry.pauseAfter);
+      });
+
+      kmz.load(entry.kmz);
+    });
+  }
+
+  // === SEQUENZA COMPLETA ===
+  async function playSequence() {
+    for (const entry of sequence) {
+      await playKMZ(entry);
+    }
+    log("\n=== Sequenza completata ===");
+  }
+
+  playSequence();
+</script>
+
+</body>
+</html>

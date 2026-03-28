@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <title>Mappa animata con log</title>
+
+  <style>
+    body {
+      margin: 0;
+      display: flex;
+      height: 100vh;
+      font-family: sans-serif;
+    }
+    #map {
+      flex: 3;
+    }
+    #log {
+      flex: 1;
+      padding: 10px;
+      background: #111;
+      color: #0f0;
+      font-size: 13px;
+      overflow-y: auto;
+      white-space: pre;
+    }
+  </style>
+
+  <link rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-kmz@latest/dist/leaflet-kmz.js"></script>
+</head>
+<body>
+
+  <div id="map"></div>
+  <div id="log"></div>
+
+  <script>
+    const map = L.map('map').setView([42.35, 13.40], 11);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19
+    }).addTo(map);
+
+    const logDiv = document.getElementById("log");
+
+    function log(text) {
+      logDiv.textContent += text + "\n";
+      logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    // Parametro: tempo tra un punto e l'altro (ms)
+    const DRAW_SPEED = 800; // cambia come vuoi
+
+    // Funzione che anima una polyline
+    function animatePolyline(latlngs, options = {}) {
+      return new Promise(resolve => {
+        const partial = L.polyline([], options).addTo(map);
+
+        let i = 0;
+        function step() {
+          if (i >= latlngs.length) {
+            resolve();
+            return;
+          }
+
+          const p = latlngs[i];
+          partial.addLatLng(p);
+
+          log(`Punto ${i}: ${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}`);
+
+          i++;
+          setTimeout(step, DRAW_SPEED);
+        }
+
+        step();
+      });
+    }
+
+    // Carica KMZ
+    const kmz = L.kmzLayer();
+
+    kmz.on("load", async e => {
+      const root = e.layer;
+
+      map.fitBounds(root.getBounds());
+
+      log("KMZ caricato. Inizio animazione…");
+
+      // Estrai tutte le polylines del KMZ
+      root.eachLayer(async layer => {
+        if (layer instanceof L.Polyline) {
+          const latlngs = layer.getLatLngs();
+
+          // Se è una MultiPolyline, appiattisci
+          const flat = latlngs.flat ? latlngs.flat() : latlngs;
+
+          // Nascondi la polyline originale
+          map.removeLayer(layer);
+
+          // Anima la polyline
+          await animatePolyline(flat, { color: "red", weight: 10 });
+        }
+      });
+
+      log("Animazione completata.");
+    });
+
+    kmz.load("kmz/casesparse.kmz");
+    kmz.addTo(map);
+  </script>
+
+</body>
+</html>

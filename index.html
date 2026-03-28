@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <title>Performance Map Sequencer</title>
+
+  <style>
+    body {
+      margin: 0;
+      display: flex;
+      height: 100vh;
+      font-family: sans-serif;
+      background: #000;
+    }
+    #map { flex: 3; }
+    #log {
+      flex: 1;
+      padding: 10px;
+      background: #111;
+      color: #0f0;
+      font-size: 13px;
+      overflow-y: auto;
+      white-space: pre;
+    }
+
+    /* === CURSORE PULSANTE === */
+    .pulse {
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%   { opacity: 1; }
+      50%  { opacity: 0.2; }
+      100% { opacity: 1; }
+    }
+
+    /* Dissolvenza dei tracciati */
+    .fadeout {
+      transition: opacity 1s;
+      opacity: 0;
+    }
+  </style>
+
+  <link rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate-src.js"></script>
+  <script src="https://unpkg.com/leaflet-kmz@latest/dist/leaflet-kmz.js"></script>
+</head>
+<body>
+
+<div id="map"></div>
+<div id="log"></div>
+
+<script>
+  const map = L.map('map', { rotate: true, touchRotate: false }).setView([42.35, 13.40], 12);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19
+  }).addTo(map);
+
+  const logDiv = document.getElementById("log");
+  function log(t) {
+    logDiv.textContent += t + "\n";
+    logDiv.scrollTop = logDiv.scrollHeight;
+  }
+
+  // === CURSORE PULSANTE ===
+  const cursor = L.circleMarker([0,0], {
+    radius: 10,
+    color: "#fff",
+    fillColor: "#fff",
+    fillOpacity: 1,
+    weight: 4,
+    className: "pulse"
+  });
+
+  // === LISTA DEI PERCORSI ===
+  const sequence = [
+    {
+      kmz: "kmz/ariafresca.kmz",
+      view: { lat: 42.351803, lng: 13.396453, zoom: 15, bearing: -34 },
+      speed: 500,
+      pauseAfter: 2000
+    },
+    {
+      kmz: "kmz/casesparse.kmz",
+      view: { lat: 42.351803, lng: 13.396453, zoom: 16, bearing: -30 },
+      speed: 500,
+      pauseAfter: 3000
+    }
+  ];
+
+  let currentLayerGroup = null;
+
+  // === INTERPOLAZIONE TRA DUE PUNTI ===
+  function lerp(a, b, t) {
+    return {
+      lat: a.lat + (b.lat - a.lat) * t,
+      lng: a.lng + (b.lng - a.lng) * t
+    };
+  }
+
+  // === ANIMAZIONE DI UNA POLYLINE (progressione continua) ===
+  // speed = pixel al secondo (velocità di scorrimento sulla mappa)
+  function animatePolyline(latlngs, speed, group) {
+    return new Promise(resolve => {
+      const partial = L.polyline([], { color: "red", weight: 8 });
+      group.addLayer(partial);
+      group.addLayer(cursor);
+
+      // Pre-calcola le distanze in gradi tra vertici consecutivi
+      // e la lunghezza totale del percorso
+      const segLengths = [];
+      for (let i = 0; i < latlngs.length - 1; i++) {
+        const a = latlngs[i], b = latlngs[i + 1];
+        const dlat = b.lat - a.lat, dlng = b.lng - a.lng;
+        segLengths.push(Math.sqrt(dlat * dlat + dlng * dlng));
+      }
+      const totalLength = segLengths.reduce((s, v) => s + v, 0);
+
+      if (totalLength === 0) { resolve(); return; }
+
+      // speed è in "gradi/s" — se vuoi usarlo come "punti/ms" originale
+      // lo convertiamo: speed originale era ms/punto, ora usiamo gradi/s
+      // Per compatibilità: velocità = totalLength / (latlngs.length * speed / 1000) gradi/s
+      const duration = latlngs.length * speed; // ms totali (stessa durata di prima)
+      const startTime = performance.now();
+
+      function tick(now) {
+        const elapsed = now - startTime;
+        const t = Math.min(elapsed / duration, 1); // 0..1
+        const targetDist = t * totalLength;
+
+        // Trova in quale segmento siamo e a quale frazione
+        let acc = 0;
+        let seg = 0;
+        for (seg = 0; seg < segLengths.length; seg++) {
+          if (acc + segLengths[seg] >= targetDist) break;
+          acc += segLengths[seg];
+        }
+
+        const segT = segLengths[seg] > 0
+          ? (targetDist - acc) / segLengths[seg]
+          : 0;
+
+        const p = lerp(latlngs[seg], latlngs[Math.min(seg + 1, latlngs.length - 1)], segT);
+
+        partial.addLatLng(p);
+        cursor.setLatLng(p);
+
+        if (t < 1) {
+          requestAnimationFrame(tick);
+        } else {
+          // Assicura che l'ultimo punto sia esatto
+          partial.addLatLng(latlngs[latlngs.length - 1]);
+          cursor.setLatLng(latlngs[latlngs.length - 1]);
+          resolve();
+        }
+      }
+
+      requestAnimationFrame(tick);
+    });
+  }
+
+  // === ANIMAZIONE BEARING ===
+  function animateBearing(fromBearing, toBearing, durationMs) {
+    return new Promise(resolve => {
+      const start = performance.now();
+      const delta = toBearing - fromBearing;
+
+      function tick(now) {
+        const elapsed = now - start;
+        const t = Math.min(elapsed / durationMs, 1);
+        // easing ease-in-out
+        const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+        map.setBearing(fromBearing + delta * ease);
+        if (t < 1) {
+          requestAnimationFrame(tick);
+        } else {
+          resolve();
+        }
+      }
+
+      requestAnimationFrame(tick);
+    });
+  }
+
+  let currentBearing = 0;
+
+  // === DISSOLVENZA E RIMOZIONE ===
+  function fadeAndRemove(group) {
+    return new Promise(resolve => {
+      group.eachLayer(layer => {
+        if (layer._path) {
+          layer._path.classList.add("fadeout");
+        }
+      });
+
+      setTimeout(() => {
+        map.removeLayer(group);
+        resolve();
+      }, 1000);
+    });
+  }
+
+  // === CARICA E ANIMA UN KMZ ===
+  async function playKMZ(entry) {
+    log(`\n=== Carico ${entry.kmz} ===`);
+
+    // 🔥 RESET TOTALE CON DISSOLVENZA + rotazione bearing in parallelo
+    const targetBearing = entry.view.bearing ?? 0;
+    const bearingAnim = animateBearing(currentBearing, targetBearing, 1000);
+
+    if (currentLayerGroup) {
+      await Promise.all([
+        fadeAndRemove(currentLayerGroup),
+        bearingAnim
+      ]);
+      currentLayerGroup = null;
+    } else {
+      await bearingAnim;
+    }
+
+    currentBearing = targetBearing;
+    currentLayerGroup = L.layerGroup().addTo(map);
+
+    // Imposta l'inquadratura
+    map.setView([entry.view.lat, entry.view.lng], entry.view.zoom);
+
+    await new Promise(resolve => {
+      const kmz = L.kmzLayer();
+
+      kmz.on("load", async e => {
+        const root = e.layer;
+
+        // Sposta TUTTI i layer del KMZ dentro currentLayerGroup
+        root.eachLayer(layer => {
+          currentLayerGroup.addLayer(layer);
+        });
+        map.removeLayer(root);
+
+        const polylines = [];
+
+        currentLayerGroup.eachLayer(layer => {
+          if (layer instanceof L.Polyline) {
+            const lls = layer.getLatLngs();
+            const flat = lls.flat ? lls.flat() : lls;
+            polylines.push(flat);
+            currentLayerGroup.removeLayer(layer);
+          }
+        });
+
+        for (const line of polylines) {
+          await animatePolyline(line, entry.speed, currentLayerGroup);
+        }
+
+        log(`Fine ${entry.kmz}, pausa ${entry.pauseAfter}ms`);
+        setTimeout(resolve, entry.pauseAfter);
+      });
+
+      kmz.load(entry.kmz);
+    });
+  }
+
+  // === SEQUENZA COMPLETA ===
+  async function playSequence() {
+    for (const entry of sequence) {
+      await playKMZ(entry);
+    }
+    log("\n=== Sequenza completata ===");
+  }
+
+  playSequence();
+</script>
+
+</body>
+</html>

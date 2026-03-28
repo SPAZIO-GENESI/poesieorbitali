@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <title>Mappa con KMZ</title>
+
+  <style>
+    html, body, #map {
+      height: 100%;
+      width: 100%;
+      margin: 0;
+      padding: 0;
+    }
+  </style>
+
+  <!-- Leaflet CSS/JS -->
+  <link rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Plugin leaflet-kmz -->
+  <script src="https://unpkg.com/leaflet-kmz@latest/dist/leaflet-kmz.js"></script>
+</head>
+<body>
+  <div id="map"></div>
+
+  <script>
+    // Crea la mappa su base OpenStreetMap
+    var map = L.map('map').setView([42.35, 13.40], 11); // centro su L'Aquila, adatta come vuoi
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Istanzia il layer KMZ
+    var kmzLayer = L.kmzLayer().addTo(map);
+
+    // Quando il KMZ è caricato, lo aggiungo ai controlli e adatto i bounds
+    var overlaysControl = L.control.layers(null, null, { collapsed: false }).addTo(map);
+
+    kmzLayer.on('load', function (e) {
+      var layer = e.layer;
+      overlaysControl.addOverlay(layer, e.name);
+      // opzionale: zoom automatico sul contenuto del KMZ
+      map.fitBounds(layer.getBounds());
+    });
+
+    // Carica uno o più file KMZ
+    // Può essere un URL assoluto o relativo al tuo server
+    kmzLayer.load('kmz/casesparse.kmz');
+    // kmzLayer.load('percorsi/altro_percorso.kmz');
+  </script>
+</body>
+</html>
