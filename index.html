@@ -191,8 +191,8 @@
   // === CURSORE PULSANTE ===
   const cursor = L.circleMarker([0,0], {
     radius: 10,
-    color: "#fff",
-    fillColor: "#fff",
+    color: "#f00000",
+    fillColor: "#ff0000",
     fillOpacity: 1,
     weight: 4,
     className: "pulse"
@@ -251,7 +251,7 @@
   // speed = pixel al secondo (velocità di scorrimento sulla mappa)
   function animatePolyline(latlngs, speed, group) {
     return new Promise(resolve => {
-      const partial = L.polyline([], { color: "red", weight: 8 });
+      const partial = L.polyline([], { color: "white", weight: 8 });
       group.addLayer(partial);
       group.addLayer(cursor);
 
