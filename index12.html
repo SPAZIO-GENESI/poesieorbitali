@@ -37,9 +37,8 @@
         display: flex;
         flex: 1;
         overflow: hidden;
-        min-height: 0;
       }
-      #map { flex: 3; min-height: 0; }
+      #map { flex: 3; }
       #log {
         flex: 1;
         padding: 10px;
@@ -48,14 +47,6 @@
         font-size: 13px;
         overflow-y: auto;
         white-space: pre;
-        min-height: 0;
-      }
-
-      @media (max-width: 767px) {
-        #main { flex-direction: column !important; }
-        #map  { flex: 7 0 0 !important; width: 100% !important; min-height: 0; }
-        #log  { flex: 3 0 0 !important; width: 100% !important; min-height: 0;
-                font-size: 11px; padding: 6px 8px; border-top: 1px solid #222; }
       }
 
       /* === NAVBAR === */
@@ -251,54 +242,16 @@
     };
   }
 
-  // === SPOSTAMENTO CURSORE SU STRADE REALI (OSRM) ===
-  async function moveCursor(from, to, group, durationMs) {
-    if (!map.hasLayer(cursor)) group.addLayer(cursor);
-
-    // Recupera percorso su strada da OSRM (walking = pedoni, strade e sentieri)
-    let waypoints = null;
-    try {
-      const url = `https://router.project-osrm.org/route/v1/foot/` +
-                  `${from.lng},${from.lat};${to.lng},${to.lat}` +
-                  `?overview=full&geometries=geojson`;
-      const res = await fetch(url);
-      const data = await res.json();
-      if (data.code === 'Ok' && data.routes.length > 0) {
-        waypoints = data.routes[0].geometry.coordinates.map(c => ({ lat: c[1], lng: c[0] }));
-      }
-    } catch(e) { /* fallback a linea retta */ }
-
-    // Fallback: linea retta interpolata
-    if (!waypoints || waypoints.length < 2) {
-      waypoints = [from, to];
-    }
-
-    // Pre-calcola lunghezze segmenti per progressione uniforme nel tempo
-    const segLengths = [];
-    for (let i = 0; i < waypoints.length - 1; i++) {
-      const a = waypoints[i], b = waypoints[i + 1];
-      const dlat = b.lat - a.lat, dlng = b.lng - a.lng;
-      segLengths.push(Math.sqrt(dlat * dlat + dlng * dlng));
-    }
-    const totalLength = segLengths.reduce((s, v) => s + v, 0);
-
+  // === SPOSTAMENTO CURSORE SENZA TRACCIA (tra una polyline e l'altra) ===
+  function moveCursor(from, to, group, durationMs) {
     return new Promise(resolve => {
+      if (!map.hasLayer(cursor)) group.addLayer(cursor);
       const start = performance.now();
 
       function tick(now) {
         const t = Math.min((now - start) / durationMs, 1);
         const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
-        const targetDist = ease * totalLength;
-
-        let acc = 0, seg = 0;
-        for (seg = 0; seg < segLengths.length; seg++) {
-          if (acc + segLengths[seg] >= targetDist) break;
-          acc += segLengths[seg];
-        }
-        const segT = segLengths[seg] > 0 ? (targetDist - acc) / segLengths[seg] : 0;
-        const p = lerp(waypoints[seg], waypoints[Math.min(seg + 1, waypoints.length - 1)], segT);
-        cursor.setLatLng(p);
-
+        cursor.setLatLng(lerp(from, to, ease));
         if (t < 1) {
           requestAnimationFrame(tick);
         } else {
