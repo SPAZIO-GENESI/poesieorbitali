@@ -2,7 +2,6 @@
 <html lang="it">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Poesie Orbitali — Spazio Genesi</title>
   <!-- Matomo -->
     <script>
@@ -52,37 +51,11 @@
         min-height: 0;
       }
 
-      @media (max-width: 900px) {
-        html, body {
-          overflow: hidden;
-        }
-        #wrapper {
-          height: 100dvh;
-          max-width: 100vw;
-          overflow: hidden;
-        }
-        #main {
-          flex-direction: column !important;
-          height: 100% !important;
-          width: 100vw !important;
-          overflow: hidden;
-          min-height: 0;
-        }
-        #map {
-          flex: none !important;
-          width: 100vw !important;
-          height: 70% !important;
-          min-height: 0;
-        }
-        #log {
-          flex: none !important;
-          width: 100vw !important;
-          height: 30% !important;
-          min-height: 0;
-          font-size: 11px;
-          padding: 6px 8px;
-          border-top: 1px solid #222;
-        }
+      @media (max-width: 767px) {
+        #main { flex-direction: column !important; }
+        #map  { flex: 7 0 0 !important; width: 100% !important; min-height: 0; }
+        #log  { flex: 3 0 0 !important; width: 100% !important; min-height: 0;
+                font-size: 11px; padding: 6px 8px; border-top: 1px solid #222; }
       }
 
       /* === NAVBAR === */
