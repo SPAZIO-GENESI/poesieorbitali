@@ -196,7 +196,7 @@
       </a>
       <div class="sg-title">
         <div class="sg-title-main">Poesie Orbitali</div>
-        <div class="sg-title-sub">movimento urbano di Névoa-na-rua</div>
+        <div class="sg-title-sub">parole urbane di Névoa-na-rua</div>
       </div>
 
       <button class="navbar-toggler" type="button"
@@ -221,12 +221,12 @@
 </div>
 
 <script>
-  const map = L.map('map', { rotate: true, touchRotate: false }).setView([42.35, 13.40], 12);
-
-  // Tile layer aereo da OpenStreetMap (non sempre disponibile)
-  // L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  //   maxZoom: 19
-  // }).addTo(map);
+  const map = L.map('map', {
+    rotate: true,
+    touchRotate: false,
+    zoomSnap: 0.5,
+    zoomDelta: 0.5
+  }).setView([42.35, 13.40], 12);
 
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
      attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
@@ -254,19 +254,18 @@
   // === LISTA DEI PERCORSI ===
   const sequence = [
     {
-      kmz: "kmz/ariafresca.kmz",
-      view: { lat: 42.351803, lng: 13.396453, zoom: 15, bearing: -34 }, // zoom 11
-      speed: 700,
-      pauseAfter: 2000
+      kmz: "kmz/0_aria_fresca.kmz",
+      view: { lat: 42.351803, lng: 13.396453, zoom: 11, bearing: -34 },
+      speed: 50,
+      pauseAfter: 10
     },
     {
-      kmz: "kmz/casesparse.kmz",
-      view: { lat: 42.351803, lng: 13.396453, zoom: 16, bearing: -30 },
-      speed: 900,
-      pauseAfter: 3000
+      kmz: "kmz/1_acque_lente.kmz",
+      view: { lat: 42.351803, lng: 13.396453, zoom: 11.5, bearing: -30 },
+      speed: 50,
+      pauseAfter: 100
     }
   ];
-
 
   let currentLayerGroup = null;
 
@@ -282,7 +281,6 @@
   async function moveCursor(from, to, group, durationMs) {
     if (!map.hasLayer(cursor)) group.addLayer(cursor);
 
-    // Recupera percorso su strada da OSRM (walking = pedoni, strade e sentieri)
     let waypoints = null;
     try {
       const url = `https://router.project-osrm.org/route/v1/foot/` +
@@ -295,12 +293,10 @@
       }
     } catch(e) { /* fallback a linea retta */ }
 
-    // Fallback: linea retta interpolata
     if (!waypoints || waypoints.length < 2) {
       waypoints = [from, to];
     }
 
-    // Pre-calcola lunghezze segmenti per progressione uniforme nel tempo
     const segLengths = [];
     for (let i = 0; i < waypoints.length - 1; i++) {
       const a = waypoints[i], b = waypoints[i + 1];
@@ -338,16 +334,13 @@
     });
   }
 
-  // === ANIMAZIONE DI UNA POLYLINE (progressione continua) ===
-  // speed = pixel al secondo (velocità di scorrimento sulla mappa)
+  // === ANIMAZIONE DI UNA POLYLINE ===
   function animatePolyline(latlngs, speed, group) {
     return new Promise(resolve => {
       const partial = L.polyline([], { color: "white", weight: 8 });
       group.addLayer(partial);
       group.addLayer(cursor);
 
-      // Pre-calcola le distanze in gradi tra vertici consecutivi
-      // e la lunghezza totale del percorso
       const segLengths = [];
       for (let i = 0; i < latlngs.length - 1; i++) {
         const a = latlngs[i], b = latlngs[i + 1];
@@ -358,32 +351,23 @@
 
       if (totalLength === 0) { resolve(); return; }
 
-      // speed è in "gradi/s" — se vuoi usarlo come "punti/ms" originale
-      // lo convertiamo: speed originale era ms/punto, ora usiamo gradi/s
-      // Per compatibilità: velocità = totalLength / (latlngs.length * speed / 1000) gradi/s
-      const duration = latlngs.length * speed; // ms totali (stessa durata di prima)
+      const duration = latlngs.length * speed;
       const startTime = performance.now();
       let frameCount = 0;
 
       function tick(now) {
         const elapsed = now - startTime;
-        const t = Math.min(elapsed / duration, 1); // 0..1
+        const t = Math.min(elapsed / duration, 1);
         const targetDist = t * totalLength;
 
-        // Trova in quale segmento siamo e a quale frazione
-        let acc = 0;
-        let seg = 0;
+        let acc = 0, seg = 0;
         for (seg = 0; seg < segLengths.length; seg++) {
           if (acc + segLengths[seg] >= targetDist) break;
           acc += segLengths[seg];
         }
 
-        const segT = segLengths[seg] > 0
-          ? (targetDist - acc) / segLengths[seg]
-          : 0;
-
+        const segT = segLengths[seg] > 0 ? (targetDist - acc) / segLengths[seg] : 0;
         const p = lerp(latlngs[seg], latlngs[Math.min(seg + 1, latlngs.length - 1)], segT);
-
         partial.addLatLng(p);
         cursor.setLatLng(p);
 
@@ -395,7 +379,6 @@
         if (t < 1) {
           requestAnimationFrame(tick);
         } else {
-          // Assicura che l'ultimo punto sia esatto
           partial.addLatLng(latlngs[latlngs.length - 1]);
           cursor.setLatLng(latlngs[latlngs.length - 1]);
           resolve();
@@ -415,7 +398,6 @@
       function tick(now) {
         const elapsed = now - start;
         const t = Math.min(elapsed / durationMs, 1);
-        // easing ease-in-out
         const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
         map.setBearing(fromBearing + delta * ease);
         if (t < 1) {
@@ -447,11 +429,21 @@
     });
   }
 
+  // === FLYTO CON ATTESA ===
+  function flyToAndWait(lat, lng, zoom, durationSec) {
+    return new Promise(resolve => {
+      map.flyTo([lat, lng], zoom, {
+        duration: durationSec,
+        easeLinearity: 0.5
+      });
+      setTimeout(resolve, durationSec * 1000);
+    });
+  }
+
   // === CARICA E ANIMA UN KMZ ===
   async function playKMZ(entry) {
     log(`\n=== Carico ${entry.kmz} ===`);
 
-    // 🔥 RESET TOTALE CON DISSOLVENZA + rotazione bearing in parallelo
     const targetBearing = entry.view.bearing ?? 0;
     const bearingAnim = animateBearing(currentBearing, targetBearing, 1000);
 
@@ -468,8 +460,8 @@
     currentBearing = targetBearing;
     currentLayerGroup = L.layerGroup().addTo(map);
 
-    // Imposta l'inquadratura
-    map.setView([entry.view.lat, entry.view.lng], entry.view.zoom);
+    // Opzione B: flyTo animato invece di setView istantaneo
+    await flyToAndWait(entry.view.lat, entry.view.lng, entry.view.zoom, 2.5);
 
     await new Promise(resolve => {
       const kmz = L.kmzLayer();
@@ -477,7 +469,6 @@
       kmz.on("load", async e => {
         const root = e.layer;
 
-        // Sposta TUTTI i layer del KMZ dentro currentLayerGroup
         root.eachLayer(layer => {
           currentLayerGroup.addLayer(layer);
         });
@@ -495,7 +486,6 @@
         });
 
         for (let i = 0; i < polylines.length; i++) {
-          // Se non è la prima, sposta il cursore dall'ultimo punto al primo della prossima
           if (i > 0) {
             const prevEnd = polylines[i - 1][polylines[i - 1].length - 1];
             const nextStart = polylines[i][0];
@@ -503,8 +493,7 @@
               Math.pow(nextStart.lat - prevEnd.lat, 2) +
               Math.pow(nextStart.lng - prevEnd.lng, 2)
             );
-            // durata proporzionale alla distanza, min 200ms max 1500ms
-            const moveDuration = Math.min(4000, Math.max(3000, dist * 800000));
+            const moveDuration = Math.min(2000, Math.max(500, dist * 800000));
             await moveCursor(prevEnd, nextStart, currentLayerGroup, moveDuration);
           }
           await animatePolyline(polylines[i], entry.speed, currentLayerGroup);
