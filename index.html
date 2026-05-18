@@ -42,7 +42,7 @@
       }
       #map { flex: 3; min-height: 0; }
       #log {
-        flex: 1;
+        flex: 0.8;
         padding: 10px;
         background: #111;
         color: #0f0;
@@ -76,7 +76,7 @@
         }
         #log {
           flex: none !important;
-          width: 100vw !important;
+          width: 60vw !important;
           height: 30% !important;
           min-height: 0;
           font-size: 11px;
@@ -263,7 +263,13 @@
       kmz: "kmz/1_acque_lente.kmz",
       view: { lat: 42.351803, lng: 13.396453, zoom: 11.5, bearing: -30 },
       speed: 50,
-      pauseAfter: 100
+      pauseAfter: 10
+    },
+        {
+      kmz: "kmz/3_case_sparse.kmz",
+      view: { lat: 42.351803, lng: 13.396453, zoom: 12, bearing: -30 },
+      speed: 50,
+      pauseAfter: 10
     }
   ];
 
