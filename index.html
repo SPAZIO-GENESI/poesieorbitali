@@ -448,6 +448,7 @@
   }
 
   let currentBearing = 0;
+  const LOOP_PAUSE_MS = 6000; // pausa in ms tra fine sequenza e ripartenza
 
   // === DISSOLVENZA E RIMOZIONE ===
   function fadeAndRemove(group) {
@@ -544,13 +545,15 @@
   }
 
   // === SEQUENZA COMPLETA ===
-  async function playSequence() {
+async function playSequence() {
+  while (true) {
     for (const entry of sequence) {
       await playKMZ(entry);
     }
-    log("\n=== Sequenza completata ===");
+    log("\n=== Sequenza completata — riavvio in " + LOOP_PAUSE_MS + "ms ===");
+    await new Promise(resolve => setTimeout(resolve, LOOP_PAUSE_MS));
   }
-
+}
   playSequence();
 </script>
 
